@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>دفتر الديون</title>
+<style>
+:root{--b:#6D0F2A;--b2:#4a0a1d;--g:#C9A24B;--w:#fff;--bg:#faf6f0}
+*{box-sizing:border-box;font-family:Tahoma,Arial,sans-serif}
+body{margin:0;background:var(--bg);color:#2b2b2b;padding-bottom:40px}
+header{background:linear-gradient(135deg,var(--b),var(--b2));color:var(--g);padding:calc(env(safe-area-inset-top,0px) + 22px) 18px 20px;border-bottom:4px solid var(--g);display:flex;align-items:center;gap:10px}
+header h1{margin:0;font-size:22px;flex:1}
+.back{background:none;border:1px solid var(--g);color:var(--g);border-radius:10px;padding:6px 12px;font-size:16px}
+main{padding:14px}
+.card{background:var(--w);border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 2px 10px #6d0f2a1f;border-right:5px solid var(--g)}
+label{font-size:13px;color:var(--b);display:block;margin:8px 0 4px}
+input{width:100%;padding:12px;border:1.5px solid #e2d3b0;border-radius:10px;font-size:16px;background:#fffdf8}
+input:focus{outline:none;border-color:var(--b)}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:17px;margin-top:10px;background:var(--b);color:var(--g);font-weight:bold}
+.btn.gold{background:var(--g);color:var(--b2)}
+.row{display:flex;align-items:center;gap:8px;padding:11px 4px;border-bottom:1px solid #f0e6d0}
+.row b{flex:1}.row span{color:var(--b);font-weight:bold}
+.x{background:none;border:0;color:#b00;font-size:20px}
+.total{background:var(--b);color:var(--g);border-radius:12px;padding:12px;text-align:center;font-size:18px;margin-top:10px}
+.empty{text-align:center;color:#999;padding:16px}
+.two{display:flex;gap:8px}
+</style></head><body>
+<header id="hd"></header><main id="app"></main>
+<script>
+const $=s=>document.querySelector(s),esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let db=JSON.parse(localStorage.getItem('db')||'{"store":"","phone":"","groups":[]}');
+const save=()=>localStorage.setItem('db',JSON.stringify(db));
+const fmt=n=>Number(n).toLocaleString('en-US');
+const sum=g=>g.items.reduce((a,b)=>a+Number(b.amount),0);
+let cur=null,ed=-1;
+
+function home(){cur=null;
+ $('#hd').innerHTML='<h1>📒 دفتر الديون</h1>';
+ $('#app').innerHTML=`<div class="card"><b>بيانات المتجر (تظهر في كل PDF)</b>
+ <label>اسم المتجر / الشركة</label><input id="st" value="${esc(db.store)}">
+ <label>رقم الهاتف</label><input id="ph" type="tel" value="${esc(db.phone)}"></div>
+ <div class="card"><b>قائمة جديدة</b><label>اسم المجموعة (مثال: ديون شهر 5)</label><input id="gn">
+ <button class="btn" onclick="addG()">+ إنشاء مجموعة مدينين</button></div>
+ ${db.groups.length?db.groups.map((g,i)=>`<div class="card" onclick="openG(${i})"><b>${esc(g.name)}</b><br><small>${g.items.length} مدين — الإجمالي ${fmt(sum(g))}</small></div>`).join(''):'<div class="empty">لا توجد مجموعات بعد</div>'}`;
+ $('#st').oninput=e=>{db.store=e.target.value;save()};$('#ph').oninput=e=>{db.phone=e.target.value;save()};
+}
+function addG(){const n=$('#gn').value.trim();if(!n)return alert('اكتب اسم المجموعة');
+ db.groups.unshift({name:n,store:db.store,phone:db.phone,items:[]});save();openG(0)}
+function openG(i){cur=i;ed=-1;const g=db.groups[i];
+ $('#hd').innerHTML='<button class="back" onclick="home()">رجوع</button><h1>'+esc(g.name)+'</h1>';
+ $('#app').innerHTML=`<div class="card"><label>اسم المجموعة (اسم ملف PDF)</label><input id="gname" value="${esc(g.name)}">
+ <label>اسم المتجر</label><input id="gs" value="${esc(g.store)}"><label>رقم الهاتف</label><input id="gp" type="tel" value="${esc(g.phone)}"></div>
+ <div class="card"><b id="ft">إضافة مدين</b><label>الاسم</label><input id="dn"><label>المبلغ</label><input id="da" type="number" inputmode="decimal">
+ <button class="btn gold" id="sv" onclick="saveD()">حفظ المدين</button></div>
+ <div class="card" id="list"></div><button class="btn" onclick="pdf()">📄 إنشاء / مشاركة PDF</button>
+ <button class="btn" style="background:#b00;color:#fff" onclick="delG()">حذف المجموعة</button>`;
+ $('#gname').oninput=e=>{g.name=e.target.value;save();$('#hd').querySelector('h1').textContent=g.name};
+ $('#gs').oninput=e=>{g.store=e.target.value;save()};$('#gp').oninput=e=>{g.phone=e.target.value;save()};
+ list()}
+function list(){const g=db.groups[cur];
+ $('#list').innerHTML=(g.items.length?g.items.map((d,i)=>`<div class="row"><b onclick="editD(${i})">${esc(d.name)}</b><span onclick="editD(${i})">${fmt(d.amount)}</span><button class="x" onclick="delD(${i})">✕</button></div>`).join('')+`<div class="total">الإجمالي: ${fmt(sum(g))}</div>`:'<div class="empty">لا يوجد مدينون</div>')}
+function saveD(){const g=db.groups[cur],n=$('#dn').value.trim(),a=parseFloat($('#da').value);
+ if(!n||isNaN(a))return alert('أدخل الاسم والمبلغ');
+ if(ed>=0)g.items[ed]={name:n,amount:a};else g.items.push({name:n,amount:a});
+ ed=-1;save();$('#dn').value='';$('#da').value='';$('#ft').textContent='إضافة مدين';list()}
+function editD(i){const d=db.groups[cur].items[i];ed=i;$('#dn').value=d.name;$('#da').value=d.amount;$('#ft').textContent='تعديل مدين';scrollTo(0,0)}
+function delD(i){if(confirm('حذف هذا المدين؟')){db.groups[cur].items.splice(i,1);save();list()}}
+function delG(){if(confirm('حذف المجموعة بالكامل؟')){db.groups.splice(cur,1);save();home()}}
+
+async function pdf(){const g=db.groups[cur];if(!g.items.length)return alert('أضف مدينين أولا');
+ const W=1240,H=1754,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ x.fillStyle='#fff';x.fillRect(0,0,W,H);x.direction='rtl';
+ x.fillStyle='#6D0F2A';x.fillRect(0,0,W,280);x.fillStyle='#C9A24B';x.fillRect(0,280,W,12);
+ x.textAlign='center';x.fillStyle='#C9A24B';x.font='bold 84px Tahoma,Arial';x.fillText(g.store||'',W/2,135,W-120);
+ x.fillStyle='#fff';x.font='46px Tahoma,Arial';x.fillText(g.phone?'☎ '+g.phone:'',W/2,220);
+ x.fillStyle='#6D0F2A';x.font='bold 60px Tahoma,Arial';x.fillText(g.name,W/2,400,W-120);
+ x.fillStyle='#777';x.font='32px Tahoma,Arial';x.fillText(new Date().toLocaleDateString('en-GB'),W/2,450);
+ const top=490,bot=1560,n=g.items.length,rh=Math.min(80,(bot-top)/(n+1)),fs=Math.max(14,rh*.5);
+ x.fillStyle='#C9A24B';x.fillRect(80,top,W-160,rh);x.fillStyle='#4a0a1d';x.font=`bold ${fs}px Tahoma,Arial`;x.textAlign='right';
+ x.fillText('الاسم',W-150,top+rh*.68);x.textAlign='left';x.fillText('المبلغ',150,top+rh*.68);
+ g.items.forEach((d,i)=>{const y=top+rh*(i+1);if(i%2==0){x.fillStyle='#faf3e3';x.fillRect(80,y,W-160,rh)}
+  x.fillStyle='#222';x.font=`${fs}px Tahoma,Arial`;x.textAlign='right';x.fillText(`${i+1}.  ${d.name}`,W-150,y+rh*.68,W-500);
+  x.textAlign='left';x.fillText(fmt(d.amount),150,y+rh*.68)});
+ x.fillStyle='#6D0F2A';x.fillRect(80,1600,W-160,100);x.fillStyle='#C9A24B';x.font='bold 54px Tahoma,Arial';x.textAlign='center';
+ x.fillText('الإجمالي: '+fmt(sum(g)),W/2,1668);
+ const b64=c.toDataURL('image/jpeg',.92).split(',')[1];
+ const jpg=Uint8Array.from(atob(b64),ch=>ch.charCodeAt(0)),bytes=mkpdf(jpg,W,H);
+ let bin='';for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
+ const data=btoa(bin),fn=(g.name.replace(/[\\/:*?"<>|]/g,'_')||'debts')+'.pdf',P=window.Capacitor&&Capacitor.Plugins;
+ try{if(P&&P.Filesystem){let r;try{r=await P.Filesystem.writeFile({path:fn,data,directory:'DOCUMENTS',recursive:true})}
+   catch(e){r=await P.Filesystem.writeFile({path:fn,data,directory:'CACHE'})}
+   alert('تم حفظ الملف: '+fn);await P.Share.share({title:fn,url:r.uri})}
+  else{const a=document.createElement('a');a.href='data:application/pdf;base64,'+data;a.download=fn;a.click()}}
+ catch(e){if(!/cancel/i.test(e.message||''))alert('خطأ: '+e.message)}}
+function mkpdf(j,w,h){const e=new TextEncoder(),p=[],o=[];let L=0;const put=u=>{p.push(u);L+=u.length},s=t=>put(e.encode(t));
+ const obj=(n,body,bin)=>{o[n]=L;s(n+' 0 obj\n'+body);if(bin){put(bin);s('\nendstream')}s('\nendobj\n')};
+ s('%PDF-1.4\n');obj(1,'<</Type/Catalog/Pages 2 0 R>>');obj(2,'<</Type/Pages/Kids[3 0 R]/Count 1>>');
+ obj(3,'<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</XObject<</I 5 0 R>>>>/Contents 4 0 R>>');
+ const cs='q 595 0 0 842 0 0 cm /I Do Q';obj(4,`<</Length ${cs.length}>>\nstream\n${cs}\nendstream`);
+ obj(5,`<</Type/XObject/Subtype/Image/Width ${w}/Height ${h}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${j.length}>>\nstream\n`,j);
+ const xr=L;s('xref\n0 6\n0000000000 65535 f \n');for(let i=1;i<=5;i++)s(String(o[i]).padStart(10,'0')+' 00000 n \n');
+ s(`trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xr}\n%%EOF`);
+ const out=new Uint8Array(L);let k=0;p.forEach(u=>{out.set(u,k);k+=u.length});return out}
+home();
+</script></body></html>
